@@ -33,6 +33,8 @@ struct Args {
     album_artist: Option<String>,
     #[clap(short = 'y', long)]
     date: Option<String>,
+    #[clap(short, long)]
+    verbose: bool,
 
     /// CSV file containing columns: file, disc, track, title, artist
     input_csv: PathBuf,
@@ -99,6 +101,9 @@ impl Args {
         cmd.args(&["-c:a", "flac", "-y"]);
         cmd.arg(&output_file);
 
+        if self.verbose {
+            println!("+ {cmd:?}");
+        }
         let output = cmd.output().map_err(|err| {
             println!("Failed to execute ffmpeg {cmd:?}: {err}");
             output_file.clone()

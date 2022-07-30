@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::process::Command;
@@ -11,8 +12,8 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 struct Track {
     file: PathBuf,
-    disc: u32,
-    track: u32,
+    disc: Option<u32>,
+    track: Option<u32>,
     title: String,
     artist: String,
 }
@@ -43,7 +44,7 @@ struct Args {
     output_dir: PathBuf,
 }
 
-fn maybe_metadata(key: &str, val: &Option<String>) -> String {
+fn maybe_metadata<T: Display>(key: &str, val: &Option<T>) -> String {
     match val {
         Some(ref val) => format!("{key}={val}"),
         None => String::new(),
@@ -57,10 +58,14 @@ impl Args {
             None => Cow::Borrowed(&track.file),
         };
 
+        let prefix = match (track.disc, track.track) {
+            (Some(disc), Some(track)) => format!("{disc}.{track}-"),
+            (Some(disc), None) => format!("{disc}-"),
+            (None, Some(track)) => format!("{track}-"),
+            (None, None) => String::new(),
+        };
         let output_file = self.output_dir.join(format!(
-            "{disc}.{track:02}-{artist}-{title}.flac",
-            disc = track.disc,
-            track = track.track,
+            "{prefix}{artist}-{title}.flac",
             artist = deunicode(&track.artist),
             title = deunicode(&track.title),
         ));
@@ -80,8 +85,8 @@ impl Args {
             maybe_metadata("album", &self.album_title),
             maybe_metadata("album_artist", &self.album_artist),
             maybe_metadata("date", &self.date),
-            format!("disc={}", track.disc),
-            format!("track={}", track.track),
+            maybe_metadata("disc", &track.disc),
+            maybe_metadata("track", &track.track),
         ];
         for m in metadata.iter().filter(|s| !s.is_empty()) {
             cmd.arg("-metadata");

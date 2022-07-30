@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 use std::fmt::Display;
-use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use deunicode::deunicode;
+use rayon::prelude::*;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +34,8 @@ struct Args {
     album_artist: Option<String>,
     #[clap(short = 'y', long)]
     date: Option<String>,
+    #[clap(short = 'j', long)]
+    threads: Option<usize>,
     #[clap(short, long)]
     verbose: bool,
 
@@ -52,7 +54,7 @@ fn maybe_metadata<T: Display>(key: &str, val: &Option<T>) -> String {
 }
 
 impl Args {
-    fn convert_track(&self, track: &Track) -> Result<(), PathBuf> {
+    fn convert_track(&self, track: &Track) -> Result<()> {
         let input_file = match &self.input_dir {
             Some(dir) => Cow::Owned(dir.join(&track.file)),
             None => Cow::Borrowed(&track.file),
@@ -109,28 +111,44 @@ impl Args {
         if self.verbose {
             println!("+ {cmd:?}");
         }
-        let output = cmd.output().map_err(|err| {
-            println!("Failed to execute ffmpeg {cmd:?}: {err}");
-            output_file.clone()
-        })?;
 
+        let output = cmd
+            .output()
+            .with_context(|| "Failed to execute ffmpeg {cmd:?}")?;
         if output.status.success() {
             println!("OK: {}", output_file.display());
             Ok(())
         } else {
-            println!("\nffmpeg FAILED");
-            println!("command: {cmd:?}");
-            println!("\nstandard output:");
-            let _ = stdout().write_all(&output.stdout);
-            println!("\nstandard error:");
-            let _ = stdout().write_all(&output.stderr);
-            Err(output_file)
+            Err(anyhow!(
+                "failed to convert {infile} into {outfile}: ffmpeg command failed\n\
+                 \n\
+                 command: {cmd:?}\n\
+                 \n\
+                 standard output:\n\
+                 {stdout}\n\
+                 \n\
+                 standard error:\n\
+                 {stderr}\n",
+                infile = track.file.display(),
+                outfile = output_file.display(),
+                cmd = cmd,
+                stdout = String::from_utf8_lossy(&output.stdout),
+                stderr = String::from_utf8_lossy(&output.stderr),
+            ))
         }
     }
 }
 
 fn run() -> Result<()> {
     let args = Args::parse();
+
+    if let Some(threads) = args.threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build_global()
+            .context("failed to initialize rayon global thread pool")?;
+    }
+
     let mut reader = csv::ReaderBuilder::new()
         .trim(csv::Trim::All)
         .from_path(&args.input_csv)
@@ -138,22 +156,22 @@ fn run() -> Result<()> {
 
     std::fs::create_dir_all(&args.output_dir).context("failed to create output directory")?;
 
-    for res in reader.deserialize::<Track>() {
-        let track = res.context("failed to read CSV")?;
-        args.convert_track(&track).map_err(|path| {
-            anyhow!(
-                "Failed to convert {} into {}",
-                track.file.display(),
-                path.display()
-            )
-        })?;
-    }
-    Ok(())
+    // Neat, you can collect from an iterator of Results into a Result of a collection. Returns
+    // Ok(collection) if every value was Ok, or Err(e) of the first Err item.
+    let tracks = reader
+        .deserialize()
+        .collect::<Result<Vec<Track>, _>>()
+        .context("failed to parse CSV file")?;
+
+    // short-circuits returning the first error, or Ok(()) on success
+    tracks
+        .par_iter()
+        .try_for_each(|track| args.convert_track(track))
 }
 
 fn main() {
     if let Err(err) = run() {
-        println!("Error: {err}");
+        println!("Error: {err:#}");
         std::process::exit(1);
     }
 }

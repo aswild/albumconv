@@ -19,30 +19,53 @@ struct Track {
 }
 
 #[derive(Debug, Parser)]
+#[clap(version, setting(clap::AppSettings::DeriveDisplayOrder))]
 struct Args {
-    /// Cover art file (jpg or png image)
-    #[clap(short, long)]
-    cover: Option<PathBuf>,
-
-    /// Directory that input files are loacted in
+    /// Directory that input files are loacted in (default is the current directory)
     #[clap(short = 'd', long)]
     input_dir: Option<PathBuf>,
 
+    /// Cover art file (jpg or png image. This path is always relative to the current directory,
+    /// not the directory specified by --input-dir)
+    #[clap(short, long)]
+    cover: Option<PathBuf>,
+
+    /// Album Title ('album' metadata field)
     #[clap(short = 't', long)]
     album_title: Option<String>,
+
+    /// Album Artist ('album_artist' metadata field)
     #[clap(short, long)]
     album_artist: Option<String>,
+
+    /// Album date/year ('date' metadata field)
     #[clap(short = 'y', long)]
     date: Option<String>,
+
+    /// Number of parallel conversion tasks (default or 0 uses all CPU cores)
     #[clap(short = 'j', long)]
     threads: Option<usize>,
+
+    /// Show verbose output, including which ffmpeg commands are run
     #[clap(short, long)]
     verbose: bool,
 
-    /// CSV file containing columns: file, disc, track, title, artist
+    /// CSV file containing track information
+    ///
+    /// The input CSV should contain these columns:
+    ///     file    - The input filename, relative to the directory specified by --input-dir
+    ///     disc    - The disc number for this track
+    ///     track   - The track number for this track
+    ///     title   - The track's title
+    ///     artist  - The track's artist
+    ///
+    /// The disc and track columns are optional, or individual rows can have an empty value for
+    /// those columns. In this case, no disc or track metadata field will be added to the output
+    /// file.
+    #[clap(verbatim_doc_comment)]
     input_csv: PathBuf,
 
-    /// Directory to write output files
+    /// Directory in which to write output files
     output_dir: PathBuf,
 }
 

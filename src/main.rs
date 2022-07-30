@@ -59,9 +59,9 @@ impl Args {
         };
 
         let prefix = match (track.disc, track.track) {
-            (Some(disc), Some(track)) => format!("{disc}.{track}-"),
+            (Some(disc), Some(track)) => format!("{disc}.{track:02}-"),
             (Some(disc), None) => format!("{disc}-"),
-            (None, Some(track)) => format!("{track}-"),
+            (None, Some(track)) => format!("{track:02}-"),
             (None, None) => String::new(),
         };
         let output_file = self.output_dir.join(format!(

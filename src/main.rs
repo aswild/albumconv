@@ -15,7 +15,7 @@ struct Track {
     disc: Option<u32>,
     track: Option<u32>,
     title: String,
-    artist: String,
+    artist: Option<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -83,6 +83,19 @@ impl Args {
             None => Cow::Borrowed(&track.file),
         };
 
+        let artist = track
+            .artist
+            .as_deref()
+            .or(self.album_artist.as_deref())
+            .map(deunicode)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Unable to determine artist for track {}. Fill in the 'artist' CSV column or \
+                     use --album-artist",
+                    track.file.display(),
+                )
+            })?;
+
         let prefix = match (track.disc, track.track) {
             (Some(disc), Some(track)) => format!("{disc}.{track:02}-"),
             (Some(disc), None) => format!("{disc}-"),
@@ -91,7 +104,7 @@ impl Args {
         };
         let output_file = self.output_dir.join(format!(
             "{prefix}{artist}-{title}.flac",
-            artist = deunicode(&track.artist),
+            artist = deunicode(&artist),
             title = deunicode(&track.title),
         ));
 
@@ -106,7 +119,7 @@ impl Args {
 
         let metadata = [
             format!("title={}", track.title),
-            format!("artist={}", track.artist),
+            format!("artist={artist}"),
             maybe_metadata("album", &self.album_title),
             maybe_metadata("album_artist", &self.album_artist),
             maybe_metadata("date", &self.date),

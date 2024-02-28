@@ -87,7 +87,6 @@ impl Args {
             .artist
             .as_deref()
             .or(self.album_artist.as_deref())
-            .map(deunicode)
             .ok_or_else(|| {
                 anyhow!(
                     "Unable to determine artist for track {}. Fill in the 'artist' CSV column or \

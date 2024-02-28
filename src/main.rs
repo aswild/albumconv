@@ -103,19 +103,19 @@ impl Args {
         };
         let output_file = self.output_dir.join(format!(
             "{prefix}{artist}-{title}.flac",
-            artist = deunicode(&artist),
+            artist = deunicode(artist),
             title = deunicode(&track.title),
         ));
 
         let mut cmd = Command::new("ffmpeg");
-        cmd.args(&["-hide_banner", "-nostdin", "-i"]);
+        cmd.args(["-hide_banner", "-nostdin", "-i"]);
         cmd.arg(&*input_file);
         if let Some(cover) = &self.cover {
             cmd.arg("-i");
             cmd.arg(cover);
-            cmd.args(&["-map", "0:a", "-map", "1:v"]);
+            cmd.args(["-map", "0:a", "-map", "1:v"]);
         } else {
-            cmd.args(&["-map", "0:a"]);
+            cmd.args(["-map", "0:a"]);
         }
 
         let metadata = [
@@ -133,7 +133,7 @@ impl Args {
         }
 
         if self.cover.is_some() {
-            cmd.args(&[
+            cmd.args([
                 "-c:v",
                 "copy",
                 "-disposition:v",
@@ -142,7 +142,7 @@ impl Args {
                 "comment=Cover (front)",
             ]);
         }
-        cmd.args(&["-c:a", "flac", "-y"]);
+        cmd.args(["-c:a", "flac", "-y"]);
         cmd.arg(&output_file);
 
         if self.verbose {

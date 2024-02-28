@@ -113,8 +113,10 @@ impl Args {
         if let Some(cover) = &self.cover {
             cmd.arg("-i");
             cmd.arg(cover);
+            cmd.args(&["-map", "0:a", "-map", "1:v"]);
+        } else {
+            cmd.args(&["-map", "0:a"]);
         }
-        cmd.args(&["-map", "0:a", "-map", "1:v"]);
 
         let metadata = [
             format!("title={}", track.title),
